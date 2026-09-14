@@ -137,6 +137,7 @@ function boundStartInput(input: AgentRunnerStartInput): AgentRunnerModelStartInp
     issueSummaries: input.issueSummaries.map(wrapUntrustedJsonValue),
     repoCandidates: input.repoCandidates.map(boundRepoCandidate),
     customPrompt: boundNullable(input.customPrompt),
+    prBaseBranch: boundNullable(input.prBaseBranch),
     memories: input.memories.map((memory) => ({
       ...memory,
       title: wrapUntrustedContent(memory.title),
