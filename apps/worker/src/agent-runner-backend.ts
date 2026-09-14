@@ -6,7 +6,10 @@ import type {
   AgentRunTrigger,
   PrPolicy,
 } from "@superlog/db";
-import type { AGENT_CONTENT_BOUNDARY_VERSION } from "./agent-content-boundary.js";
+import type {
+  AGENT_CONTENT_BOUNDARY_VERSION,
+  UntrustedJsonValue,
+} from "./agent-content-boundary.js";
 import type { AgentRunFindings, ExecutedAction } from "./agent-outcome-tools.js";
 
 export type AgentRunnerRepoCandidate = {
@@ -144,6 +147,12 @@ export type AgentRunnerStartInput = {
   // Closed incidents this one descends from (recurrence/escalation chain),
   // newest first, capped. Empty for first-time incidents.
   predecessors: AgentRunnerPredecessorIncident[];
+};
+
+export type AgentRunnerModelStartInput = Omit<AgentRunnerStartInput, "issueSummaries"> & {
+  // Complete summaries are serialized into opaque boundary envelopes once,
+  // avoiding per-field prompt overhead while preserving nested data keys.
+  issueSummaries: UntrustedJsonValue[];
 };
 
 // A pending outcome-action tool call handed to the worker's executor by the
@@ -355,4 +364,12 @@ export type AgentRunnerBackend = {
     chatId: string;
     onReply(text: string, replyId: string): Promise<void>;
   }): Promise<AgentChatDispatchResult>;
+};
+
+export type AgentRunnerModelBackend = Omit<
+  AgentRunnerBackend,
+  "contentBoundaryVersion" | "start"
+> & {
+  contentBoundaryVersion: typeof AGENT_CONTENT_BOUNDARY_VERSION;
+  start(input: AgentRunnerModelStartInput): Promise<{ sessionId: string }>;
 };

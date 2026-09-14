@@ -6,7 +6,8 @@ import {
 import type {
   AgentChatStartInput,
   AgentRunnerBackend,
-  AgentRunnerIssueSummary,
+  AgentRunnerModelBackend,
+  AgentRunnerModelStartInput,
   AgentRunnerStartInput,
 } from "../../agent-runner-backend.js";
 import { communityRunnerBackend } from "./community.js";
@@ -93,7 +94,7 @@ async function importRunnerModule(specifier: string, runtime: string): Promise<A
   return enforceExternalContentBoundary(backend);
 }
 
-function enforceExternalContentBoundary(backend: AgentRunnerBackend): AgentRunnerBackend {
+function enforceExternalContentBoundary(backend: AgentRunnerModelBackend): AgentRunnerBackend {
   const recover = backend.recover?.bind(backend);
   const classifyDeliveryError = backend.classifyDeliveryError?.bind(backend);
   const interrupt = backend.interrupt?.bind(backend);
@@ -128,12 +129,12 @@ function enforceExternalContentBoundary(backend: AgentRunnerBackend): AgentRunne
   };
 }
 
-function boundStartInput(input: AgentRunnerStartInput): AgentRunnerStartInput {
+function boundStartInput(input: AgentRunnerStartInput): AgentRunnerModelStartInput {
   return {
     ...input,
     title: wrapUntrustedContent(input.title),
     service: boundNullable(input.service),
-    issueSummaries: input.issueSummaries.map(boundIssueSummary),
+    issueSummaries: input.issueSummaries.map(wrapUntrustedJsonValue),
     repoCandidates: input.repoCandidates.map(boundRepoCandidate),
     customPrompt: boundNullable(input.customPrompt),
     memories: input.memories.map((memory) => ({
@@ -205,47 +206,13 @@ function safeRepositoryFullName(fullName: string): string {
   return fullName;
 }
 
-function boundIssueSummary(issue: AgentRunnerIssueSummary): AgentRunnerIssueSummary {
-  return {
-    ...issue,
-    title: wrapUntrustedContent(issue.title),
-    exceptionType: wrapUntrustedContent(issue.exceptionType),
-    message: boundNullable(issue.message),
-    topFrame: boundNullable(issue.topFrame),
-    normalizedFrames: issue.normalizedFrames.map(wrapUntrustedContent),
-    stacktrace: boundNullable(issue.stacktrace),
-    sessionId: boundNullable(issue.sessionId),
-    lastSample:
-      issue.lastSample == null ? issue.lastSample : wrapUntrustedJsonValue(issue.lastSample),
-    traceContext: boundNullable(issue.traceContext),
-    alertEpisode: issue.alertEpisode
-      ? {
-          alert: {
-            ...issue.alertEpisode.alert,
-            name: wrapUntrustedContent(issue.alertEpisode.alert.name),
-            source: wrapUntrustedContent(issue.alertEpisode.alert.source),
-            metricName: boundNullable(issue.alertEpisode.alert.metricName),
-            filter: wrapUntrustedJsonValue(issue.alertEpisode.alert.filter),
-            groupBy: boundNullable(issue.alertEpisode.alert.groupBy),
-            groupMode: wrapUntrustedContent(issue.alertEpisode.alert.groupMode),
-            aggregation: wrapUntrustedContent(issue.alertEpisode.alert.aggregation),
-          },
-          episode: {
-            ...issue.alertEpisode.episode,
-            groupKey: wrapUntrustedContent(issue.alertEpisode.episode.groupKey),
-          },
-        }
-      : null,
-  };
-}
-
 function boundNullable(value: string | null): string | null;
 function boundNullable(value: string | null | undefined): string | null | undefined;
 function boundNullable(value: string | null | undefined): string | null | undefined {
   return value == null ? value : wrapUntrustedContent(value);
 }
 
-function isAgentRunnerBackend(value: unknown): value is AgentRunnerBackend {
+function isAgentRunnerBackend(value: unknown): value is AgentRunnerModelBackend {
   if (!value || typeof value !== "object") return false;
   const backend = value as Partial<AgentRunnerBackend>;
   return (
