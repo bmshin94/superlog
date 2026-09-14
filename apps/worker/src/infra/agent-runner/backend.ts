@@ -132,6 +132,7 @@ function boundStartInput(input: AgentRunnerStartInput): AgentRunnerStartInput {
     title: wrapUntrustedContent(input.title),
     service: boundNullable(input.service),
     issueSummaries: input.issueSummaries.map(boundIssueSummary),
+    repoCandidates: input.repoCandidates.map(boundRepoCandidate),
     customPrompt: boundNullable(input.customPrompt),
     memories: input.memories.map((memory) => ({
       ...memory,
@@ -176,11 +177,22 @@ function boundChatInput(input: AgentChatStartInput): AgentChatStartInput {
     projectName: wrapUntrustedContent(input.projectName),
     question: wrapUntrustedContent(input.question),
     requester: boundNullable(input.requester),
+    repoCandidates: input.repoCandidates.map(boundRepoCandidate),
     memories: input.memories.map((memory) => ({
       ...memory,
       title: wrapUntrustedContent(memory.title),
       body: wrapUntrustedContent(memory.body),
     })),
+  };
+}
+
+function boundRepoCandidate(
+  repo: AgentRunnerStartInput["repoCandidates"][number],
+): AgentRunnerStartInput["repoCandidates"][number] {
+  return {
+    ...repo,
+    fullName: wrapUntrustedContent(repo.fullName),
+    instructionFiles: repo.instructionFiles.map(wrapUntrustedContent),
   };
 }
 
