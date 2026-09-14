@@ -4,8 +4,10 @@ import {
   UNTRUSTED_CONTENT_NOTICE,
   UNTRUSTED_CONTENT_SYSTEM_RULE,
   unwrapUntrustedContent,
+  unwrapUntrustedJsonValue,
   wrapUntrustedContent,
   wrapUntrustedJson,
+  wrapUntrustedJsonValue,
 } from "./agent-content-boundary.js";
 
 test("external content cannot close its assigned boundary", () => {
@@ -55,4 +57,7 @@ test("structured external content uses the same boundary", () => {
 
   assert.ok(wrapped.includes('"trace_id":"trace-1"'));
   assert.ok(wrapped.includes("&lt;/untrusted_content&gt;"));
+
+  const value = wrapUntrustedJsonValue({ trace_id: "trace-1" });
+  assert.deepEqual(unwrapUntrustedJsonValue(value), { trace_id: "trace-1" });
 });

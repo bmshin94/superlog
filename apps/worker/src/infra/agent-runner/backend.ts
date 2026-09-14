@@ -1,6 +1,7 @@
 import {
   AGENT_CONTENT_BOUNDARY_VERSION,
   wrapUntrustedContent,
+  wrapUntrustedJsonValue,
 } from "../../agent-content-boundary.js";
 import type {
   AgentChatStartInput,
@@ -191,9 +192,16 @@ function boundRepoCandidate(
 ): AgentRunnerStartInput["repoCandidates"][number] {
   return {
     ...repo,
-    fullName: wrapUntrustedContent(repo.fullName),
+    fullName: safeRepositoryFullName(repo.fullName),
     instructionFiles: repo.instructionFiles.map(wrapUntrustedContent),
   };
+}
+
+function safeRepositoryFullName(fullName: string): string {
+  if (!/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/iu.test(fullName)) {
+    throw new Error("configured model runtime received an unsafe repository identifier");
+  }
+  return fullName;
 }
 
 function boundIssueSummary(issue: AgentRunnerIssueSummary): AgentRunnerIssueSummary {
@@ -206,7 +214,8 @@ function boundIssueSummary(issue: AgentRunnerIssueSummary): AgentRunnerIssueSumm
     normalizedFrames: issue.normalizedFrames.map(wrapUntrustedContent),
     stacktrace: boundNullable(issue.stacktrace),
     sessionId: boundNullable(issue.sessionId),
-    lastSample: boundUnknownStrings(issue.lastSample),
+    lastSample:
+      issue.lastSample == null ? issue.lastSample : wrapUntrustedJsonValue(issue.lastSample),
     traceContext: boundNullable(issue.traceContext),
     alertEpisode: issue.alertEpisode
       ? {
@@ -215,7 +224,7 @@ function boundIssueSummary(issue: AgentRunnerIssueSummary): AgentRunnerIssueSumm
             name: wrapUntrustedContent(issue.alertEpisode.alert.name),
             source: wrapUntrustedContent(issue.alertEpisode.alert.source),
             metricName: boundNullable(issue.alertEpisode.alert.metricName),
-            filter: boundUnknownStrings(issue.alertEpisode.alert.filter) as Record<string, unknown>,
+            filter: wrapUntrustedJsonValue(issue.alertEpisode.alert.filter),
             groupBy: boundNullable(issue.alertEpisode.alert.groupBy),
             groupMode: wrapUntrustedContent(issue.alertEpisode.alert.groupMode),
             aggregation: wrapUntrustedContent(issue.alertEpisode.alert.aggregation),
@@ -227,18 +236,6 @@ function boundIssueSummary(issue: AgentRunnerIssueSummary): AgentRunnerIssueSumm
         }
       : null,
   };
-}
-
-function boundUnknownStrings(value: unknown): unknown {
-  if (typeof value === "string") return wrapUntrustedContent(value);
-  if (Array.isArray(value)) return value.map(boundUnknownStrings);
-  if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.entries(value).map(([key, entry]) => [
-      wrapUntrustedContent(key),
-      boundUnknownStrings(entry),
-    ]),
-  );
 }
 
 function boundNullable(value: string | null): string | null;
