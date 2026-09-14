@@ -280,6 +280,14 @@ export type AgentChatDispatchResult = {
 //   - "unknown": neither state is provable from the error.
 export type SessionDeliveryErrorKind = "wedged_turn" | "session_gone" | "unknown";
 
+/**
+ * Provider boundary for investigation and chat runtimes.
+ *
+ * Model-backed implementations own prompt construction. They must treat
+ * human messages, repository text, telemetry, and other externally supplied
+ * fields as untrusted, using the shared agent-content boundary before adding
+ * them to model context.
+ */
 export type AgentRunnerBackend = {
   name: string;
   maxRepoResources: number;
