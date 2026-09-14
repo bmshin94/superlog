@@ -116,11 +116,7 @@ function enforceExternalContentBoundary(backend: AgentRunnerBackend): AgentRunne
       ),
     ...(recover
       ? {
-          recover: (sessionId, input) =>
-            recover(sessionId, {
-              ...input,
-              continuationMessage: wrapUntrustedContent(input.continuationMessage),
-            }),
+          recover: (sessionId, input) => recover(sessionId, input),
         }
       : {}),
     ...(classifyDeliveryError
