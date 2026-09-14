@@ -327,6 +327,18 @@ test("getAgentRunnerBackend preserves the recovery receiver while bounding its m
   assert.ok(String(recovered).includes("&lt;/untrusted_content&gt;"));
 });
 
+test("getAgentRunnerBackend keeps trusted orchestration steering outside the boundary", async () => {
+  process.env.AGENT_RUNNER_ANTHROPIC_MODULE =
+    "data:text/javascript,export const agentRunnerBackend = { name: 'anthropic', maxRepoResources: 7, contentBoundaryVersion: 'untrusted-content-v1', async start() { return { sessionId: 's' }; }, async terminate() {}, async startChat() { return { sessionId: 'c' }; }, async sendChatMessage() {}, async collect() { throw new Error('not used'); }, async resume() {}, async steer(_id, message) { throw new Error(message); }, async dispatchIntegrationToolCalls() { return 0; }, async dispatchChatToolCalls() { return { handled: 0, repliesThisTurn: 0 }; } };";
+  const backend = await getAgentRunnerBackend("anthropic");
+  const trustedPrompt = "Call report_findings, then resolve_incident.";
+
+  await assert.rejects(
+    () => backend.steer("s", trustedPrompt, "trusted_orchestration"),
+    (error: unknown) => error instanceof Error && error.message === trustedPrompt,
+  );
+});
+
 test("getAgentRunnerBackend rejects an external runtime without a configured module", async () => {
   Reflect.deleteProperty(process.env, "AGENT_RUNNER_ANTHROPIC_MODULE");
 

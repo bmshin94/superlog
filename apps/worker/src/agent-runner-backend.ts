@@ -280,6 +280,7 @@ export type AgentChatDispatchResult = {
 //     deleted) — only this kind justifies discarding the session's context.
 //   - "unknown": neither state is provable from the error.
 export type SessionDeliveryErrorKind = "wedged_turn" | "session_gone" | "unknown";
+export type AgentRunnerSteerTrust = "external" | "trusted_orchestration";
 
 /**
  * Provider boundary for investigation and chat runtimes.
@@ -310,7 +311,7 @@ export type AgentRunnerBackend = {
   sendChatMessage(sessionId: string, message: string): Promise<void>;
   collect(sessionId: string): Promise<AgentRunnerSnapshot>;
   resume(sessionId: string, message: string): Promise<void>;
-  steer(sessionId: string, message: string): Promise<void>;
+  steer(sessionId: string, message: string, trust: AgentRunnerSteerTrust): Promise<void>;
   // Recover a resumable provider turn in place. The backend owns its resource
   // model; the application supplies fresh credentials only for repositories
   // the provider says are attached to this session.

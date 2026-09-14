@@ -108,7 +108,12 @@ function enforceExternalContentBoundary(backend: AgentRunnerBackend): AgentRunne
       backend.sendChatMessage(sessionId, wrapUntrustedContent(message)),
     collect: (sessionId) => backend.collect(sessionId),
     resume: (sessionId, message) => backend.resume(sessionId, wrapUntrustedContent(message)),
-    steer: (sessionId, message) => backend.steer(sessionId, wrapUntrustedContent(message)),
+    steer: (sessionId, message, trust) =>
+      backend.steer(
+        sessionId,
+        trust === "external" ? wrapUntrustedContent(message) : message,
+        trust,
+      ),
     ...(recover
       ? {
           recover: (sessionId, input) =>
