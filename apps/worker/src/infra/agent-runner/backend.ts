@@ -1,3 +1,4 @@
+import { AGENT_CONTENT_BOUNDARY_VERSION } from "../../agent-content-boundary.js";
 import type { AgentRunnerBackend } from "../../agent-runner-backend.js";
 import { communityRunnerBackend } from "./community.js";
 
@@ -73,6 +74,11 @@ async function importRunnerModule(specifier: string, runtime: string): Promise<A
   if (!isAgentRunnerBackend(backend)) {
     throw new Error(
       `configured ${runtime} agent runner module must export an AgentRunnerBackend as agentRunnerBackend or default`,
+    );
+  }
+  if (backend.contentBoundaryVersion !== AGENT_CONTENT_BOUNDARY_VERSION) {
+    throw new Error(
+      `configured ${runtime} runner must implement the ${AGENT_CONTENT_BOUNDARY_VERSION} external-content boundary contract`,
     );
   }
   return backend;

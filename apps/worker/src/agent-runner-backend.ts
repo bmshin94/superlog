@@ -6,6 +6,7 @@ import type {
   AgentRunTrigger,
   PrPolicy,
 } from "@superlog/db";
+import type { AGENT_CONTENT_BOUNDARY_VERSION } from "./agent-content-boundary.js";
 import type { AgentRunFindings, ExecutedAction } from "./agent-outcome-tools.js";
 
 export type AgentRunnerRepoCandidate = {
@@ -291,6 +292,9 @@ export type SessionDeliveryErrorKind = "wedged_turn" | "session_gone" | "unknown
 export type AgentRunnerBackend = {
   name: string;
   maxRepoResources: number;
+  // Required by the loader for model-backed runtime modules. Static runtimes
+  // do not construct prompts and may omit it.
+  contentBoundaryVersion?: typeof AGENT_CONTENT_BOUNDARY_VERSION;
   start(input: AgentRunnerStartInput): Promise<{ sessionId: string }>;
   // Release a session that is no longer reachable from an open Incident.
   // Implementations must be idempotent: an already-absent provider session is

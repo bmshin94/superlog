@@ -126,12 +126,13 @@ test("getAgentRunnerBackend returns a built-in disabled backend for community in
 
 test("getAgentRunnerBackend loads the external runtime from its configured module", async () => {
   process.env.AGENT_RUNNER_ANTHROPIC_MODULE =
-    "data:text/javascript,export const agentRunnerBackend = { name: 'anthropic', maxRepoResources: 7, async start() { return { sessionId: 's' }; }, async terminate() {}, async startChat() { return { sessionId: 'c' }; }, async sendChatMessage() {}, async collect() { throw new Error('not used'); }, async resume() {}, async steer() {}, async dispatchIntegrationToolCalls() { return 2; }, async dispatchChatToolCalls() { return { handled: 0, repliesThisTurn: 0 }; } };";
+    "data:text/javascript,export const agentRunnerBackend = { name: 'anthropic', maxRepoResources: 7, contentBoundaryVersion: 'untrusted-content-v1', async start() { return { sessionId: 's' }; }, async terminate() {}, async startChat() { return { sessionId: 'c' }; }, async sendChatMessage() {}, async collect() { throw new Error('not used'); }, async resume() {}, async steer() {}, async dispatchIntegrationToolCalls() { return 2; }, async dispatchChatToolCalls() { return { handled: 0, repliesThisTurn: 0 }; } };";
 
   const backend = await getAgentRunnerBackend("anthropic");
 
   assert.equal(backend.name, "anthropic");
   assert.equal(backend.maxRepoResources, 7);
+  assert.equal(backend.contentBoundaryVersion, "untrusted-content-v1");
   assert.deepEqual(await backend.start({} as Parameters<typeof backend.start>[0]), {
     sessionId: "s",
   });
@@ -153,6 +154,16 @@ test("getAgentRunnerBackend rejects a configured backend without session termina
   await assert.rejects(
     () => getAgentRunnerBackend("anthropic"),
     /must export an AgentRunnerBackend/,
+  );
+});
+
+test("getAgentRunnerBackend rejects a model runtime without the external-content boundary contract", async () => {
+  process.env.AGENT_RUNNER_ANTHROPIC_MODULE =
+    "data:text/javascript,export const agentRunnerBackend = { name: 'anthropic', maxRepoResources: 7, async start() { return { sessionId: 's' }; }, async terminate() {}, async startChat() { return { sessionId: 'c' }; }, async sendChatMessage() {}, async collect() { throw new Error('not used'); }, async resume() {}, async steer() {}, async dispatchIntegrationToolCalls() { return 0; }, async dispatchChatToolCalls() { return { handled: 0, repliesThisTurn: 0 }; } };";
+
+  await assert.rejects(
+    () => getAgentRunnerBackend("anthropic"),
+    /external-content boundary contract/,
   );
 });
 
