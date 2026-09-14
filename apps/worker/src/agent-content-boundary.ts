@@ -20,7 +20,6 @@ function escapeBoundarySyntax(content: string): string {
 }
 
 export function wrapUntrustedContent(content: string): string {
-  if (unwrapUntrustedContent(content) !== null) return content;
   return [
     UNTRUSTED_CONTENT_NOTICE,
     "<untrusted_content>",

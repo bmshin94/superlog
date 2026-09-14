@@ -93,13 +93,19 @@ async function importRunnerModule(specifier: string, runtime: string): Promise<A
 }
 
 function enforceExternalContentBoundary(backend: AgentRunnerBackend): AgentRunnerBackend {
-  const recover = backend.recover;
+  const recover = backend.recover?.bind(backend);
+  const classifyDeliveryError = backend.classifyDeliveryError?.bind(backend);
+  const interrupt = backend.interrupt?.bind(backend);
   return {
-    ...backend,
+    name: backend.name,
+    maxRepoResources: backend.maxRepoResources,
+    contentBoundaryVersion: backend.contentBoundaryVersion,
     start: (input) => backend.start(boundStartInput(input)),
+    terminate: (sessionId) => backend.terminate(sessionId),
     startChat: (input) => backend.startChat(boundChatInput(input)),
     sendChatMessage: (sessionId, message) =>
       backend.sendChatMessage(sessionId, wrapUntrustedContent(message)),
+    collect: (sessionId) => backend.collect(sessionId),
     resume: (sessionId, message) => backend.resume(sessionId, wrapUntrustedContent(message)),
     steer: (sessionId, message) => backend.steer(sessionId, wrapUntrustedContent(message)),
     ...(recover
@@ -111,6 +117,12 @@ function enforceExternalContentBoundary(backend: AgentRunnerBackend): AgentRunne
             }),
         }
       : {}),
+    ...(classifyDeliveryError
+      ? { classifyDeliveryError: (err) => classifyDeliveryError(err) }
+      : {}),
+    ...(interrupt ? { interrupt: (sessionId) => interrupt(sessionId) } : {}),
+    dispatchIntegrationToolCalls: (input) => backend.dispatchIntegrationToolCalls(input),
+    dispatchChatToolCalls: (input) => backend.dispatchChatToolCalls(input),
   };
 }
 
@@ -210,7 +222,10 @@ function boundUnknownStrings(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(boundUnknownStrings);
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(
-    Object.entries(value).map(([key, entry]) => [key, boundUnknownStrings(entry)]),
+    Object.entries(value).map(([key, entry]) => [
+      wrapUntrustedContent(key),
+      boundUnknownStrings(entry),
+    ]),
   );
 }
 
