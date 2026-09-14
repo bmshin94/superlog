@@ -1,5 +1,13 @@
-import { AGENT_CONTENT_BOUNDARY_VERSION } from "../../agent-content-boundary.js";
-import type { AgentRunnerBackend } from "../../agent-runner-backend.js";
+import {
+  AGENT_CONTENT_BOUNDARY_VERSION,
+  wrapUntrustedContent,
+} from "../../agent-content-boundary.js";
+import type {
+  AgentChatStartInput,
+  AgentRunnerBackend,
+  AgentRunnerIssueSummary,
+  AgentRunnerStartInput,
+} from "../../agent-runner-backend.js";
 import { communityRunnerBackend } from "./community.js";
 
 type AgentRunnerModule = {
@@ -81,7 +89,135 @@ async function importRunnerModule(specifier: string, runtime: string): Promise<A
       `configured ${runtime} runner must implement the ${AGENT_CONTENT_BOUNDARY_VERSION} external-content boundary contract`,
     );
   }
-  return backend;
+  return enforceExternalContentBoundary(backend);
+}
+
+function enforceExternalContentBoundary(backend: AgentRunnerBackend): AgentRunnerBackend {
+  const recover = backend.recover;
+  return {
+    ...backend,
+    start: (input) => backend.start(boundStartInput(input)),
+    startChat: (input) => backend.startChat(boundChatInput(input)),
+    sendChatMessage: (sessionId, message) =>
+      backend.sendChatMessage(sessionId, wrapUntrustedContent(message)),
+    resume: (sessionId, message) => backend.resume(sessionId, wrapUntrustedContent(message)),
+    steer: (sessionId, message) => backend.steer(sessionId, wrapUntrustedContent(message)),
+    ...(recover
+      ? {
+          recover: (sessionId, input) =>
+            recover(sessionId, {
+              ...input,
+              continuationMessage: wrapUntrustedContent(input.continuationMessage),
+            }),
+        }
+      : {}),
+  };
+}
+
+function boundStartInput(input: AgentRunnerStartInput): AgentRunnerStartInput {
+  return {
+    ...input,
+    title: wrapUntrustedContent(input.title),
+    service: boundNullable(input.service),
+    issueSummaries: input.issueSummaries.map(boundIssueSummary),
+    customPrompt: boundNullable(input.customPrompt),
+    memories: input.memories.map((memory) => ({
+      ...memory,
+      title: wrapUntrustedContent(memory.title),
+      body: wrapUntrustedContent(memory.body),
+    })),
+    followUp: input.followUp
+      ? {
+          ...input.followUp,
+          interactions: input.followUp.interactions.map((interaction) => ({
+            ...interaction,
+            author: boundNullable(interaction.author),
+            text: wrapUntrustedContent(interaction.text),
+            path: boundNullable(interaction.path),
+          })),
+          priorRun: input.followUp.priorRun
+            ? {
+                ...input.followUp.priorRun,
+                summary: wrapUntrustedContent(input.followUp.priorRun.summary),
+                rootCause: boundNullable(input.followUp.priorRun.rootCause),
+                handoffNotes: boundNullable(input.followUp.priorRun.handoffNotes),
+                validationSummary: boundNullable(input.followUp.priorRun.validationSummary),
+              }
+            : null,
+          timeline: input.followUp.timeline.map(wrapUntrustedContent),
+        }
+      : null,
+    predecessors: input.predecessors.map((predecessor) => ({
+      ...predecessor,
+      title: wrapUntrustedContent(predecessor.title),
+      resolvedReasonText: boundNullable(predecessor.resolvedReasonText),
+      agentSummary: boundNullable(predecessor.agentSummary),
+      rootCauseText: boundNullable(predecessor.rootCauseText),
+      handoffNotes: boundNullable(predecessor.handoffNotes),
+    })),
+  };
+}
+
+function boundChatInput(input: AgentChatStartInput): AgentChatStartInput {
+  return {
+    ...input,
+    projectName: wrapUntrustedContent(input.projectName),
+    question: wrapUntrustedContent(input.question),
+    requester: boundNullable(input.requester),
+    memories: input.memories.map((memory) => ({
+      ...memory,
+      title: wrapUntrustedContent(memory.title),
+      body: wrapUntrustedContent(memory.body),
+    })),
+  };
+}
+
+function boundIssueSummary(issue: AgentRunnerIssueSummary): AgentRunnerIssueSummary {
+  return {
+    ...issue,
+    title: wrapUntrustedContent(issue.title),
+    exceptionType: wrapUntrustedContent(issue.exceptionType),
+    message: boundNullable(issue.message),
+    topFrame: boundNullable(issue.topFrame),
+    normalizedFrames: issue.normalizedFrames.map(wrapUntrustedContent),
+    stacktrace: boundNullable(issue.stacktrace),
+    sessionId: boundNullable(issue.sessionId),
+    lastSample: boundUnknownStrings(issue.lastSample),
+    traceContext: boundNullable(issue.traceContext),
+    alertEpisode: issue.alertEpisode
+      ? {
+          alert: {
+            ...issue.alertEpisode.alert,
+            name: wrapUntrustedContent(issue.alertEpisode.alert.name),
+            source: wrapUntrustedContent(issue.alertEpisode.alert.source),
+            metricName: boundNullable(issue.alertEpisode.alert.metricName),
+            filter: boundUnknownStrings(issue.alertEpisode.alert.filter) as Record<string, unknown>,
+            groupBy: boundNullable(issue.alertEpisode.alert.groupBy),
+            groupMode: wrapUntrustedContent(issue.alertEpisode.alert.groupMode),
+            aggregation: wrapUntrustedContent(issue.alertEpisode.alert.aggregation),
+          },
+          episode: {
+            ...issue.alertEpisode.episode,
+            groupKey: wrapUntrustedContent(issue.alertEpisode.episode.groupKey),
+          },
+        }
+      : null,
+  };
+}
+
+function boundUnknownStrings(value: unknown): unknown {
+  if (typeof value === "string") return wrapUntrustedContent(value);
+  if (Array.isArray(value)) return value.map(boundUnknownStrings);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [key, boundUnknownStrings(entry)]),
+  );
+}
+
+function boundNullable(value: string | null): string | null;
+function boundNullable(value: string | null | undefined): string | null | undefined;
+function boundNullable(value: string | null | undefined): string | null | undefined {
+  return value == null ? value : wrapUntrustedContent(value);
 }
 
 function isAgentRunnerBackend(value: unknown): value is AgentRunnerBackend {
