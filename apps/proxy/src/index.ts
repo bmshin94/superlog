@@ -83,6 +83,13 @@ const FIREHOSE_METRICS_COLLECTOR_URL =
   process.env.FIREHOSE_METRICS_COLLECTOR_URL ?? "http://localhost:4433";
 const FIREHOSE_LOGS_COLLECTOR_URL =
   process.env.FIREHOSE_LOGS_COLLECTOR_URL ?? "http://localhost:4434";
+// AWS Firehose times out its HTTP endpoint after 60 s. We must resolve and
+// respond within that window, so abort the upstream collector fetch well before
+// then. 30 s is the default; set FIREHOSE_COLLECTOR_TIMEOUT_MS to override.
+const FIREHOSE_COLLECTOR_TIMEOUT_MS = readNonNegativeIntEnv(
+  process.env.FIREHOSE_COLLECTOR_TIMEOUT_MS,
+  30_000,
+);
 const PORT = Number(process.env.PORT ?? 4000);
 const ingestQueueConfig = getIngestQueueConfig(process.env);
 // When INGEST_CLICKHOUSE_DIRECT=true, the consumer writes logs/traces straight to
@@ -1100,6 +1107,7 @@ async function forwardFirehose(
                 method: "POST",
                 headers: upstreamHeaders,
                 body: bodyBuffer,
+                signal: AbortSignal.timeout(FIREHOSE_COLLECTOR_TIMEOUT_MS),
               });
               postSpan.setAttribute("http.response.status_code", r.status);
               if (r.status !== 200) {
